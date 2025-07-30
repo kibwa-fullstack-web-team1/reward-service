@@ -64,6 +64,9 @@ def get_user_rewards(db: Session, user_id: int) -> List[models.UserReward]:
 def get_user_reward_by_id(db: Session, user_reward_id: int) -> Optional[models.UserReward]:
     return db.query(models.UserReward).filter(models.UserReward.id == user_reward_id).first()
 
+def get_user_reward_by_user_id_and_reward_id(db: Session, user_id: int, reward_id: int) -> Optional[models.UserReward]:
+    return db.query(models.UserReward).filter(models.UserReward.user_id == user_id, models.UserReward.reward_id == reward_id).first()
+
 def update_user_reward_position(db: Session, user_reward_id: int, position_x: Optional[int], position_y: Optional[int]) -> Optional[models.UserReward]:
     db_user_reward = db.query(models.UserReward).filter(models.UserReward.id == user_reward_id).first()
     if db_user_reward:

@@ -11,6 +11,7 @@ class UserReward(Base):
     acquired_at = Column(DateTime, server_default=func.now())
     position_x = Column(Integer, nullable=True) # 정원 내 배치 X 좌표
     position_y = Column(Integer, nullable=True) # 정원 내 배치 Y 좌표
+    generated_image_url = Column(String, nullable=True) # AI 생성 이미지 URL (개인화 보상용)
 
     # 한 사용자는 같은 리워드를 한 번만 획득할 수 있도록 UniqueConstraint 추가
     __table_args__ = (UniqueConstraint('user_id', 'reward_id', name='_user_reward_uc'),)

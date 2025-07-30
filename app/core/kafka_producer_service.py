@@ -5,12 +5,13 @@ from app.config.config import Config
 def get_kafka_producer():
     return Producer({'bootstrap.servers': Config.KAFKA_BROKER_URL})
 
-def produce_reward_generation_request(producer: Producer, user_id: int, reward_type_id: int, generation_prompt: str):
+def produce_reward_generation_request(producer: Producer, user_id: int, reward_type_id: int, generation_prompt: str, user_reward_id: int):
     topic = "reward-generation-requests"
     message = {
         "user_id": user_id,
         "reward_type_id": reward_type_id,
         "generation_prompt": generation_prompt,
+        "user_reward_id": user_reward_id,
     }
     producer.produce(topic, key=str(user_id), value=json.dumps(message))
     producer.flush()
