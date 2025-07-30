@@ -13,6 +13,7 @@ class RewardBase(BaseModel):
     acquisition_condition: Optional[str] = None
     reward_type: RewardType
     stage: Optional[int] = None # 성장형 보상의 단계
+    service_category_id: Optional[int] = None # 보상이 속한 서비스 카테고리 ID
 
 class RewardCreate(RewardBase):
     pass
