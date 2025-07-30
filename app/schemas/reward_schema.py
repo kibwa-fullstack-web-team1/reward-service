@@ -30,6 +30,7 @@ class UserRewardBase(BaseModel):
     reward_id: int
     position_x: Optional[int] = None
     position_y: Optional[int] = None
+    generated_image_url: Optional[str] = None # AI 생성 이미지 URL (개인화 보상용)
 
 class UserRewardCreate(UserRewardBase):
     pass
