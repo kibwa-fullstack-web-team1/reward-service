@@ -11,7 +11,9 @@ def create_reward(db: Session, reward: schemas.RewardCreate) -> models.Reward:
         generation_prompt=reward.generation_prompt,
         image_url=reward.image_url,
         acquisition_condition=reward.acquisition_condition,
-        reward_type=reward.reward_type
+        reward_type=reward.reward_type,
+        stage=reward.stage,
+        service_category_id=reward.service_category_id
     )
     db.add(db_reward)
     db.commit()
