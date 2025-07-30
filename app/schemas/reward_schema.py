@@ -12,6 +12,7 @@ class RewardBase(BaseModel):
     image_url: Optional[str] = None
     acquisition_condition: Optional[str] = None
     reward_type: RewardType
+    stage: Optional[int] = None # 성장형 보상의 단계
 
 class RewardCreate(RewardBase):
     pass

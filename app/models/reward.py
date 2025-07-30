@@ -16,6 +16,7 @@ class Reward(Base):
     image_url = Column(String, nullable=True) # AI 생성 이미지 URL
     acquisition_condition = Column(Text, nullable=True) # 획득 조건 설명
     reward_type = Column(Enum(RewardType), nullable=False) # 유형 (성장형/개인화)
+    stage = Column(Integer, nullable=True) # 성장형 보상의 단계 (1단계, 2단계 등)
     
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())
