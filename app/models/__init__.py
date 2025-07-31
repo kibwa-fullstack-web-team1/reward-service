@@ -1,3 +1,4 @@
-from .reward import Reward, RewardType
-from .user_reward import UserReward
+from .common_reward import CommonReward
+from .personalization_reward import PersonalizationReward
+from .user_common_reward import UserCommonReward
 from .service_category import ServiceCategory

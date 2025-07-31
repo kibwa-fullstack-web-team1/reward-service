@@ -10,14 +10,14 @@ from sqlalchemy.orm import Session
 from app.utils.db import SessionLocal
 from app.core import crud_service
 from app.config.config import Config
-from app.models.reward import RewardType
-from app.schemas.reward_schema import UserRewardCreate
+# from app.models.reward import RewardType # RewardType 임포트 제거
+# from app.schemas.reward_schema import UserRewardCreate # UserRewardCreate 임포트 제거
 
 logger = logging.getLogger(__name__)
 
 # AI 이미지 생성 및 S3 업로드 관련 모듈 (가정)
 # 실제 구현에서는 Meshy.ai 또는 다른 AI API 연동 로직이 들어갑니다。
-# 여기서는 더미 함수로 대체합니다.
+# 여기서는 더미 함수로 대체합니다。
 
 def generate_ai_image(prompt: str) -> str:
     """
@@ -35,25 +35,27 @@ async def _process_message(msg):
     logger.info(f"[Kafka Consumer] Attempting to process message from topic: {msg.topic()}")
     message_value = json.loads(msg.value().decode('utf-8'))
     user_id = message_value.get("user_id")
-    reward_type_id = message_value.get("reward_type_id")
+    # reward_type_id는 이제 PersonalizationReward의 ID를 의미
+    personalization_reward_id = message_value.get("reward_type_id") 
     generation_prompt = message_value.get("generation_prompt")
+    # user_reward_id는 이제 PersonalizationReward의 ID를 의미
     user_reward_id = message_value.get("user_reward_id")
 
-    logger.info(f"[Kafka Consumer] Received message: user_id={user_id}, reward_type_id={reward_type_id}, prompt='{generation_prompt}', user_reward_id={user_reward_id}")
+    logger.info(f"[Kafka Consumer] Received message: user_id={user_id}, personalization_reward_id={personalization_reward_id}, prompt='{generation_prompt}', user_reward_id={user_reward_id}")
 
     # AI 이미지 생성
     generated_image_url = generate_ai_image(generation_prompt)
 
     db: Session = SessionLocal()
     try:
-        # UserReward 레코드 조회 및 generated_image_url 업데이트
-        user_reward_entry = crud_service.get_user_reward_by_id(db, user_reward_id)
-        if user_reward_entry:
-            user_reward_entry.generated_image_url = generated_image_url
+        # PersonalizationReward 레코드 조회 및 generated_image_url 업데이트
+        personalization_reward_entry = crud_service.get_personalization_reward(db, personalization_reward_id)
+        if personalization_reward_entry:
+            personalization_reward_entry.generated_image_url = generated_image_url
             db.commit()
-            logger.info(f"[Kafka Consumer] Updated UserReward {user_reward_entry.id} with generated image URL: {generated_image_url}")
+            logger.info(f"[Kafka Consumer] Updated PersonalizationReward {personalization_reward_entry.id} with generated image URL: {generated_image_url}")
         else:
-            logger.warning(f"[Kafka Consumer] UserReward with ID {user_reward_id} not found. Cannot update image URL.")
+            logger.warning(f"[Kafka Consumer] PersonalizationReward with ID {personalization_reward_id} not found. Cannot update image URL.")
 
     except Exception as e:
         db.rollback()

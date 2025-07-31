@@ -2,16 +2,17 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 
 from app import models, schemas
+from app.models.common_reward import CommonReward
+from app.models.personalization_reward import PersonalizationReward
+from app.models.user_common_reward import UserCommonReward
 
-# Reward CRUD operations
-def create_reward(db: Session, reward: schemas.RewardCreate) -> models.Reward:
-    db_reward = models.Reward(
+# CommonReward CRUD operations
+def create_common_reward(db: Session, reward: schemas.CommonRewardCreate) -> CommonReward:
+    db_reward = CommonReward(
         name=reward.name,
         description=reward.description,
-        generation_prompt=reward.generation_prompt,
         image_url=reward.image_url,
         acquisition_condition=reward.acquisition_condition,
-        reward_type=reward.reward_type,
         stage=reward.stage,
         service_category_id=reward.service_category_id
     )
@@ -20,17 +21,17 @@ def create_reward(db: Session, reward: schemas.RewardCreate) -> models.Reward:
     db.refresh(db_reward)
     return db_reward
 
-def get_reward(db: Session, reward_id: int) -> Optional[models.Reward]:
-    return db.query(models.Reward).filter(models.Reward.id == reward_id).first()
+def get_common_reward(db: Session, reward_id: int) -> Optional[CommonReward]:
+    return db.query(CommonReward).filter(CommonReward.id == reward_id).first()
 
-def get_reward_by_name(db: Session, name: str) -> Optional[models.Reward]:
-    return db.query(models.Reward).filter(models.Reward.name == name).first()
+def get_common_reward_by_name(db: Session, name: str) -> Optional[CommonReward]:
+    return db.query(CommonReward).filter(CommonReward.name == name).first()
 
-def get_rewards(db: Session, skip: int = 0, limit: int = 100) -> List[models.Reward]:
-    return db.query(models.Reward).offset(skip).limit(limit).all()
+def get_common_rewards(db: Session, skip: int = 0, limit: int = 100) -> List[CommonReward]:
+    return db.query(CommonReward).offset(skip).limit(limit).all()
 
-def update_reward(db: Session, reward_id: int, reward: schemas.RewardCreate) -> Optional[models.Reward]:
-    db_reward = db.query(models.Reward).filter(models.Reward.id == reward_id).first()
+def update_common_reward(db: Session, reward_id: int, reward: schemas.CommonRewardCreate) -> Optional[CommonReward]:
+    db_reward = db.query(CommonReward).filter(CommonReward.id == reward_id).first()
     if db_reward:
         for key, value in reward.model_dump(exclude_unset=True).items():
             setattr(db_reward, key, value)
@@ -38,47 +39,75 @@ def update_reward(db: Session, reward_id: int, reward: schemas.RewardCreate) -> 
         db.refresh(db_reward)
     return db_reward
 
-def delete_reward(db: Session, reward_id: int) -> Optional[models.Reward]:
-    db_reward = db.query(models.Reward).filter(models.Reward.id == reward_id).first()
+def delete_common_reward(db: Session, reward_id: int) -> Optional[CommonReward]:
+    db_reward = db.query(CommonReward).filter(CommonReward.id == reward_id).first()
     if db_reward:
         db.delete(db_reward)
         db.commit()
     return db_reward
 
-# UserReward CRUD operations
-def create_user_reward(db: Session, user_reward: schemas.UserRewardCreate) -> models.UserReward:
-    db_user_reward = models.UserReward(
-        user_id=user_reward.user_id,
-        reward_id=user_reward.reward_id,
-        position_x=user_reward.position_x,
-        position_y=user_reward.position_y
+# PersonalizationReward CRUD operations
+def create_personalization_reward(db: Session, reward: schemas.PersonalizationRewardCreate) -> PersonalizationReward:
+    db_reward = PersonalizationReward(
+        user_id=reward.user_id,
+        name=reward.name,
+        description=reward.description,
+        generation_prompt=reward.generation_prompt,
+        generated_image_url=reward.generated_image_url,
+        position_x=reward.position_x,
+        position_y=reward.position_y
     )
-    db.add(db_user_reward)
+    db.add(db_reward)
     db.commit()
-    db.refresh(db_user_reward)
-    return db_user_reward
+    db.refresh(db_reward)
+    return db_reward
 
-def get_user_rewards(db: Session, user_id: int) -> List[models.UserReward]:
-    return db.query(models.UserReward).filter(models.UserReward.user_id == user_id).all()
+def get_personalization_reward(db: Session, reward_id: int) -> Optional[PersonalizationReward]:
+    return db.query(PersonalizationReward).filter(PersonalizationReward.id == reward_id).first()
 
-def get_user_reward_by_id(db: Session, user_reward_id: int) -> Optional[models.UserReward]:
-    return db.query(models.UserReward).filter(models.UserReward.id == user_reward_id).first()
+def get_personalization_rewards_by_user_id(db: Session, user_id: int) -> List[PersonalizationReward]:
+    return db.query(PersonalizationReward).filter(PersonalizationReward.user_id == user_id).all()
 
-def get_user_reward_by_user_id_and_reward_id(db: Session, user_id: int, reward_id: int) -> Optional[models.UserReward]:
-    return db.query(models.UserReward).filter(models.UserReward.user_id == user_id, models.UserReward.reward_id == reward_id).first()
-
-def update_user_reward_position(db: Session, user_reward_id: int, position_x: Optional[int], position_y: Optional[int]) -> Optional[models.UserReward]:
-    db_user_reward = db.query(models.UserReward).filter(models.UserReward.id == user_reward_id).first()
-    if db_user_reward:
-        db_user_reward.position_x = position_x
-        db_user_reward.position_y = position_y
+def update_personalization_reward_position(db: Session, reward_id: int, position_x: Optional[int], position_y: Optional[int]) -> Optional[PersonalizationReward]:
+    db_reward = db.query(PersonalizationReward).filter(PersonalizationReward.id == reward_id).first()
+    if db_reward:
+        db_reward.position_x = position_x
+        db_reward.position_y = position_y
         db.commit()
-        db.refresh(db_user_reward)
-    return db_user_reward
+        db.refresh(db_reward)
+    return db_reward
 
-def delete_user_reward(db: Session, user_reward_id: int) -> Optional[models.UserReward]:
-    db_user_reward = db.query(models.UserReward).filter(models.UserReward.id == user_reward_id).first()
-    if db_user_reward:
-        db.delete(db_user_reward)
+def delete_personalization_reward(db: Session, reward_id: int) -> Optional[PersonalizationReward]:
+    db_reward = db.query(PersonalizationReward).filter(PersonalizationReward.id == reward_id).first()
+    if db_reward:
+        db.delete(db_reward)
         db.commit()
-    return db_user_reward
+    return db_reward
+
+# UserCommonReward CRUD operations
+def create_user_common_reward(db: Session, user_common_reward: schemas.UserCommonRewardCreate) -> UserCommonReward:
+    db_user_common_reward = UserCommonReward(
+        user_id=user_common_reward.user_id,
+        common_reward_id=user_common_reward.common_reward_id,
+        position_x=user_common_reward.position_x,
+        position_y=user_common_reward.position_y
+    )
+    db.add(db_user_common_reward)
+    db.commit()
+    db.refresh(db_user_common_reward)
+    return db_user_common_reward
+
+def get_user_common_rewards(db: Session, user_id: int) -> List[UserCommonReward]:
+    return db.query(UserCommonReward).filter(UserCommonReward.user_id == user_id).all()
+
+def get_user_common_reward_by_id(db: Session, user_common_reward_id: int) -> Optional[UserCommonReward]:
+    return db.query(UserCommonReward).filter(UserCommonReward.id == user_common_reward_id).first()
+
+def update_user_common_reward_position(db: Session, user_common_reward_id: int, position_x: Optional[int], position_y: Optional[int]) -> Optional[UserCommonReward]:
+    db_user_common_reward = db.query(UserCommonReward).filter(UserCommonReward.id == user_common_reward_id).first()
+    if db_user_common_reward:
+        db_user_common_reward.position_x = position_x
+        db_user_common_reward.position_y = position_y
+        db.commit()
+        db.refresh(db_user_common_reward)
+    return db_user_common_reward

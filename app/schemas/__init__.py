@@ -1,1 +1,4 @@
-from .reward_schema import Reward, RewardCreate, UserReward, UserRewardCreate
+from .reward_schema import (
+    CommonReward, PersonalizationReward, UserCommonReward,
+    CommonRewardCreate, PersonalizationRewardCreate, UserCommonRewardCreate
+)

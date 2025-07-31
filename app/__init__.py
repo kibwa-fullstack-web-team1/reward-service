@@ -7,8 +7,8 @@ import asyncio
 from confluent_kafka.admin import AdminClient, NewTopic
 from confluent_kafka import KafkaException
 
-# 모든 모델을 임포트하여 Base.metadata에 등록 (초기에는 비어있음)
-from app.models import reward, user_reward
+# 모든 모델을 임포트하여 Base.metadata에 등록
+from app.models import common_reward, personalization_reward, user_common_reward
 
 logger = logging.getLogger(__name__)
 
