@@ -10,14 +10,13 @@ from sqlalchemy.orm import Session
 from app.utils.db import SessionLocal
 from app.core import crud_service
 from app.config.config import Config
-# from app.models.reward import RewardType # RewardType 임포트 제거
-# from app.schemas.reward_schema import UserRewardCreate # UserRewardCreate 임포트 제거
+from app.core.aws_s3_service import S3Service # S3Service 임포트
+from openai import OpenAI # OpenAI 임포트
+import requests # requests 임포트
 
 logger = logging.getLogger(__name__)
 
-# AI 이미지 생성 및 S3 업로드 관련 모듈 (가정)
-# 실제 구현에서는 Meshy.ai 또는 다른 AI API 연동 로직이 들어갑니다。
-# 여기서는 더미 함수로 대체합니다。
+s3_service = S3Service()
 
 def generate_ai_image(prompt: str) -> str:
     """
@@ -25,11 +24,35 @@ def generate_ai_image(prompt: str) -> str:
     실제 구현에서는 Meshy.ai 등의 API를 사용합니다。
     """
     logger.info(f"[AI Image Generation] Generating image for prompt: {prompt}")
-    # 실제 이미지 생성 및 S3 업로드 로직
-    # 예시: S3에 업로드된 이미지 URL 반환
-    dummy_image_url = f"https://kibwa-17.s3.ap-southeast-1.amazonaws.com/ai-generated-rewards/dummy_{int(time.time())}.png"
-    logger.info(f"[AI Image Generation] Dummy image URL generated: {dummy_image_url}")
-    return dummy_image_url
+    
+    try:
+        client = OpenAI(api_key=Config.OPENAI_API_KEY)
+        response = client.images.generate(
+            model="dall-e-2", # DALL-E 2 사용
+            prompt=f"{prompt} in pixel art style",
+            size="1024x1024", # 1024x1024 해상도
+            
+            n=1, # 이미지 1개 생성
+        )
+        image_url = response.data[0].url
+        logger.info(f"[AI Image Generation] DALL-E generated image URL: {image_url}")
+
+        # DALL-E 이미지 다운로드 및 S3 업로드 로직 추가
+        image_data = requests.get(image_url).content
+        s3_object_name = f"ai-generated-rewards/{int(time.time())}.png"
+        s3_url = s3_service.upload_file(image_data, s3_object_name, "image/png")
+        
+        if s3_url:
+            logger.info(f"[AI Image Generation] Image uploaded to S3: {s3_url}")
+            return s3_url
+        else:
+            logger.error("[AI Image Generation] Failed to upload image to S3. Returning DALL-E URL.")
+            return image_url
+
+    except Exception as e:
+        logger.error(f"[AI Image Generation] Error generating image with DALL-E or uploading to S3: {e}", exc_info=True)
+        # 오류 발생 시 더미 URL 반환 또는 예외 처리
+        return f"https://kibwa-17.s3.ap-southeast-1.amazonaws.com/ai-generated-rewards/error_dummy_{int(time.time())}.png"
 
 async def _process_message(msg):
     logger.info(f"[Kafka Consumer] Attempting to process message from topic: {msg.topic()}")
