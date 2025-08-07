@@ -10,9 +10,10 @@ from sqlalchemy.orm import Session
 from app.utils.db import SessionLocal
 from app.core import crud_service
 from app.config.config import Config
-from app.core.aws_s3_service import S3Service # S3Service 임포트
-from openai import OpenAI # OpenAI 임포트
-import requests # requests 임포트
+from app.core.aws_s3_service import S3Service
+from app.core.dify_client import get_personalized_prompt_from_dify # Dify 클라이언트 임포트
+from openai import OpenAI
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -21,23 +22,20 @@ s3_service = S3Service()
 def generate_ai_image(prompt: str) -> str:
     """
     AI 이미지 생성 API를 호출하고 이미지 URL을 반환합니다.
-    실제 구현에서는 Meshy.ai 등의 API를 사용합니다。
     """
     logger.info(f"[AI Image Generation] Generating image for prompt: {prompt}")
     
     try:
         client = OpenAI(api_key=Config.OPENAI_API_KEY)
         response = client.images.generate(
-            model="dall-e-2", # DALL-E 2 사용
-            prompt=f"{prompt} in pixel art style",
-            size="1024x1024", # 1024x1024 해상도
-            
-            n=1, # 이미지 1개 생성
+            model="dall-e-2",
+            prompt=prompt, # Dify에서 받은 프롬프트를 그대로 사용
+            size="1024x1024",
+            n=1,
         )
         image_url = response.data[0].url
         logger.info(f"[AI Image Generation] DALL-E generated image URL: {image_url}")
 
-        # DALL-E 이미지 다운로드 및 S3 업로드 로직 추가
         image_data = requests.get(image_url).content
         s3_object_name = f"ai-generated-rewards/{int(time.time())}.png"
         s3_url = s3_service.upload_file(image_data, s3_object_name, "image/png")
@@ -51,27 +49,42 @@ def generate_ai_image(prompt: str) -> str:
 
     except Exception as e:
         logger.error(f"[AI Image Generation] Error generating image with DALL-E or uploading to S3: {e}", exc_info=True)
-        # 오류 발생 시 더미 URL 반환 또는 예외 처리
         return f"https://kibwa-17.s3.ap-southeast-1.amazonaws.com/ai-generated-rewards/error_dummy_{int(time.time())}.png"
 
 async def _process_message(msg):
     logger.info(f"[Kafka Consumer] Attempting to process message from topic: {msg.topic()}")
     message_value = json.loads(msg.value().decode('utf-8'))
     user_id = message_value.get("user_id")
-    # reward_type_id는 이제 PersonalizationReward의 ID를 의미
-    personalization_reward_id = message_value.get("reward_type_id") 
-    generation_prompt = message_value.get("generation_prompt")
-    # user_reward_id는 이제 PersonalizationReward의 ID를 의미
-    user_reward_id = message_value.get("user_reward_id")
+    personalization_reward_id = message_value.get("reward_type_id")
+    generation_prompt_template = message_value.get("generation_prompt") # 이제 템플릿으로 사용
 
-    logger.info(f"[Kafka Consumer] Received message: user_id={user_id}, personalization_reward_id={personalization_reward_id}, prompt='{generation_prompt}', user_reward_id={user_reward_id}")
+    logger.info(f"[Kafka Consumer] Received message: user_id={user_id}, personalization_reward_id={personalization_reward_id}, prompt_template='{generation_prompt_template}'")
+
+    # Dify에 전달할 LLM 프롬프트 생성
+    dify_llm_prompt = f"""# 역할
+당신은 사용자의 기억을 아름다운 이미지로 변환하는 예술가입니다.
+
+# 지시
+주어진 컨텍스트(사용자의 기억)의 핵심 감정과 내용을 포착하여, DALL-E가 이미지를 생성할 수 있는, 영어로 된, 상세하고 창의적인 한 문장의 프롬프트를 생성해주세요. 'in pixel art style'을 포함해야 합니다.
+
+# 추가 지시
+다음 키워드를 반드시 프롬프트에 포함하여, 사용자가 요청한 보상의 컨셉을 반영해주세요: {generation_prompt_template}
+
+# 출력 규칙
+오직 생성된 DALL-E 프롬프트 문장 하나만 응답해야 합니다. 다른 설명은 절대 추가하지 마세요."""
+
+    # Dify를 통해 개인화된 DALL-E 프롬프트 받아오기
+    personalized_dalle_prompt = await get_personalized_prompt_from_dify(user_id, dify_llm_prompt)
+
+    if not personalized_dalle_prompt:
+        logger.error(f"[Kafka Consumer] Failed to get personalized prompt from Dify for user {user_id}. Aborting reward generation.")
+        return
 
     # AI 이미지 생성
-    generated_image_url = generate_ai_image(generation_prompt)
+    generated_image_url = generate_ai_image(personalized_dalle_prompt)
 
     db: Session = SessionLocal()
     try:
-        # PersonalizationReward 레코드 조회 및 generated_image_url 업데이트
         personalization_reward_entry = crud_service.get_personalization_reward(db, personalization_reward_id)
         if personalization_reward_entry:
             personalization_reward_entry.generated_image_url = generated_image_url
@@ -93,7 +106,7 @@ async def _run_consumer_loop(consumer, topics, running_flag):
         logger.info(f"[Kafka Consumer] Subscribed to topics: {topics}")
 
         while running_flag[0]:
-            msg = consumer.poll(timeout=10.0) # timeout을 10.0초로 늘림
+            msg = consumer.poll(timeout=10.0)
             if msg is None:
                 logger.debug("[Kafka Consumer] No message received within timeout. Continuing to poll...")
                 continue
@@ -129,5 +142,4 @@ def start_ai_reward_consumer():
     logger.info("[Kafka Consumer] AI Reward Consumer thread started.")
 
 def stop_ai_reward_consumer():
-    # 이 함수는 현재 사용되지 않지만, 컨슈머를 안전하게 종료하기 위해 필요합니다。
     pass
