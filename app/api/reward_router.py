@@ -151,16 +151,15 @@ def award_common_reward_to_user(user_id: int, common_reward_id: int, db: Session
 # AI 개인화 리워드 생성 요청
 @router.post("/rewards/request-ai-generation", response_model=PersonalizationReward)
 def request_ai_reward_generation(
-    user_id: int = Body(...),
-    generation_prompt: str = Body(...),
+    user_id: int = Body(..., embed=True),
     db: Session = Depends(get_db)
 ):
-    # PersonalizationReward는 user_id와 generation_prompt로 직접 생성
+    # PersonalizationReward는 user_id로 직접 생성
     personalization_reward_data = PersonalizationRewardCreate(
         user_id=user_id,
         name="AI 생성 개인화 보상", # 기본 이름 설정
         description="AI가 생성한 개인화된 보상입니다.", # 기본 설명 설정
-        generation_prompt=generation_prompt,
+        generation_prompt="", # Dify에서 생성하므로 빈 문자열로 초기화
         generated_image_url=None, # 초기에는 이미지 URL 없음
         position_x=None,
         position_y=None
@@ -173,7 +172,7 @@ def request_ai_reward_generation(
         producer=producer,
         user_id=user_id,
         reward_type_id=created_personalization_reward.id, # PersonalizationReward의 ID를 reward_type_id로 전달
-        generation_prompt=generation_prompt,
+        generation_prompt="", # generation_prompt는 더 이상 사용하지 않음
         user_reward_id=created_personalization_reward.id # PersonalizationReward의 ID를 user_reward_id로 전달
     )
     
