@@ -65,15 +65,33 @@ async def _process_message(msg):
 
 # 지시
 주어진 컨텍스트(사용자의 기억)의 핵심 감정과 내용을 포착하여, DALL-E가 이미지를 생성할 수 있는, 영어로 된, 상세하고 창의적인 한 문장의 프롬프트를 생성해주세요. 'in pixel art style'을 포함해야 합니다.
+또한, 이 이미지가 어떤 기억을 기반으로 생성되었는지 설명하는 한국어 문장을 20자 내외로 생성해주세요.
 
 # 출력 규칙
-오직 생성된 DALL-E 프롬프트 문장 하나만 응답해야 합니다. 다른 설명은 절대 추가하지 마세요."""
+응답은 반드시 아래의 JSON 형식이어야 합니다.
+{{
+  "dalle_prompt": "생성된 DALL-E 프롬프트",
+  "memory_description": "기억 기반 설명 텍스트"
+}}"""
 
     # Dify를 통해 개인화된 DALL-E 프롬프트 받아오기
-    personalized_dalle_prompt = await get_personalized_prompt_from_dify(user_id, dify_llm_prompt)
+    dify_response_json_str = await get_personalized_prompt_from_dify(user_id, dify_llm_prompt)
 
-    if not personalized_dalle_prompt:
+    if not dify_response_json_str:
         logger.error(f"[Kafka Consumer] Failed to get personalized prompt from Dify for user {user_id}. Aborting reward generation.")
+        return
+
+    try:
+        dify_response_data = json.loads(dify_response_json_str)
+        personalized_dalle_prompt = dify_response_data.get("dalle_prompt")
+        memory_description = dify_response_data.get("memory_description")
+
+        if not personalized_dalle_prompt or not memory_description:
+            logger.error(f"[Kafka Consumer] Dify response missing dalle_prompt or memory_description: {dify_response_json_str}")
+            return
+
+    except json.JSONDecodeError as e:
+        logger.error(f"[Kafka Consumer] Failed to parse Dify response JSON: {e}. Response: {dify_response_json_str}")
         return
 
     # AI 이미지 생성
@@ -85,8 +103,9 @@ async def _process_message(msg):
         if personalization_reward_entry:
             personalization_reward_entry.generated_image_url = generated_image_url
             personalization_reward_entry.generation_prompt = personalized_dalle_prompt # Dify에서 생성된 프롬프트를 DB에 저장
+            personalization_reward_entry.description = memory_description # 기억 기반 설명 저장
             db.commit()
-            logger.info(f"[Kafka Consumer] Updated PersonalizationReward {personalization_reward_entry.id} with generated image URL and prompt.")
+            logger.info(f"[Kafka Consumer] Updated PersonalizationReward {personalization_reward_entry.id} with generated image URL, prompt, and description.")
         else:
             logger.warning(f"[Kafka Consumer] PersonalizationReward with ID {personalization_reward_id} not found. Cannot update image URL.")
 

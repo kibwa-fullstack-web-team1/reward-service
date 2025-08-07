@@ -151,7 +151,7 @@ def award_common_reward_to_user(user_id: int, common_reward_id: int, db: Session
 # AI 개인화 리워드 생성 요청
 @router.post("/rewards/request-ai-generation", response_model=PersonalizationReward)
 def request_ai_reward_generation(
-    user_id: int = Body(...),
+    user_id: int = Body(..., embed=True),
     db: Session = Depends(get_db)
 ):
     # PersonalizationReward는 user_id로 직접 생성
