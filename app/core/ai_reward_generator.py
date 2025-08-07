@@ -82,7 +82,15 @@ async def _process_message(msg):
         return
 
     try:
-        dify_response_data = json.loads(dify_response_json_str)
+        # Dify 응답에서 유효한 JSON 부분만 추출
+        json_start = dify_response_json_str.find('{')
+        json_end = dify_response_json_str.rfind('}')
+        if json_start == -1 or json_end == -1:
+            raise ValueError("No valid JSON object found in Dify response.")
+        
+        valid_json_str = dify_response_json_str[json_start : json_end + 1]
+        
+        dify_response_data = json.loads(valid_json_str)
         personalized_dalle_prompt = dify_response_data.get("dalle_prompt")
         memory_description = dify_response_data.get("memory_description")
 
@@ -92,6 +100,9 @@ async def _process_message(msg):
 
     except json.JSONDecodeError as e:
         logger.error(f"[Kafka Consumer] Failed to parse Dify response JSON: {e}. Response: {dify_response_json_str}")
+        return
+    except ValueError as e:
+        logger.error(f"[Kafka Consumer] Invalid Dify response format: {e}. Response: {dify_response_json_str}")
         return
 
     # AI 이미지 생성
