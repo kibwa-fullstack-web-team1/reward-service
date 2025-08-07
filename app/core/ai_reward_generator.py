@@ -56,9 +56,8 @@ async def _process_message(msg):
     message_value = json.loads(msg.value().decode('utf-8'))
     user_id = message_value.get("user_id")
     personalization_reward_id = message_value.get("reward_type_id")
-    generation_prompt_template = message_value.get("generation_prompt") # 이제 템플릿으로 사용
 
-    logger.info(f"[Kafka Consumer] Received message: user_id={user_id}, personalization_reward_id={personalization_reward_id}, prompt_template='{generation_prompt_template}'")
+    logger.info(f"[Kafka Consumer] Received message: user_id={user_id}, personalization_reward_id={personalization_reward_id}")
 
     # Dify에 전달할 LLM 프롬프트 생성
     dify_llm_prompt = f"""# 역할
@@ -66,9 +65,6 @@ async def _process_message(msg):
 
 # 지시
 주어진 컨텍스트(사용자의 기억)의 핵심 감정과 내용을 포착하여, DALL-E가 이미지를 생성할 수 있는, 영어로 된, 상세하고 창의적인 한 문장의 프롬프트를 생성해주세요. 'in pixel art style'을 포함해야 합니다.
-
-# 추가 지시
-다음 키워드를 반드시 프롬프트에 포함하여, 사용자가 요청한 보상의 컨셉을 반영해주세요: {generation_prompt_template}
 
 # 출력 규칙
 오직 생성된 DALL-E 프롬프트 문장 하나만 응답해야 합니다. 다른 설명은 절대 추가하지 마세요."""
@@ -88,8 +84,9 @@ async def _process_message(msg):
         personalization_reward_entry = crud_service.get_personalization_reward(db, personalization_reward_id)
         if personalization_reward_entry:
             personalization_reward_entry.generated_image_url = generated_image_url
+            personalization_reward_entry.generation_prompt = personalized_dalle_prompt # Dify에서 생성된 프롬프트를 DB에 저장
             db.commit()
-            logger.info(f"[Kafka Consumer] Updated PersonalizationReward {personalization_reward_entry.id} with generated image URL: {generated_image_url}")
+            logger.info(f"[Kafka Consumer] Updated PersonalizationReward {personalization_reward_entry.id} with generated image URL and prompt.")
         else:
             logger.warning(f"[Kafka Consumer] PersonalizationReward with ID {personalization_reward_id} not found. Cannot update image URL.")
 
