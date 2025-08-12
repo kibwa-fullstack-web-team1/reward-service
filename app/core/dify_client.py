@@ -16,6 +16,9 @@ async def get_personalized_prompt_from_dify(user_id: int, llm_prompt: str) -> Op
         print("Dify API 설정이 완료되지 않았습니다.")
         return None
 
+    # DALL-E 프롬프트를 더 명확하게 수정 (누끼 딴 것 같은 이미지 강조)
+    enhanced_prompt = f"An isolated, single object, {llm_prompt}, in highly detailed 8-bit pixel art style, with a perfectly transparent background, no surrounding elements, no white or colored background."
+
     url = f"{DIFY_API_URL}/v1/workflows/run"
     headers = {
         "Authorization": f"Bearer {DIFY_APP_API_KEY}",
@@ -24,7 +27,7 @@ async def get_personalized_prompt_from_dify(user_id: int, llm_prompt: str) -> Op
     payload = {
         "inputs": {
             "sys_user_id": str(user_id),
-            "llm_prompt": llm_prompt,
+            "llm_prompt": enhanced_prompt,
         },
         "response_mode": "blocking",
         "user": f"user_{user_id}"
