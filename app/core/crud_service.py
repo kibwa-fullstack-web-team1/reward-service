@@ -5,6 +5,7 @@ from app import models, schemas
 from app.models.common_reward import CommonReward
 from app.models.personalization_reward import PersonalizationReward
 from app.models.user_common_reward import UserCommonReward
+from app.models.service_category import ServiceCategory # New import
 
 # CommonReward CRUD operations
 def create_common_reward(db: Session, reward: schemas.CommonRewardCreate) -> CommonReward:
@@ -111,3 +112,7 @@ def update_user_common_reward_position(db: Session, user_common_reward_id: int, 
         db.commit()
         db.refresh(db_user_common_reward)
     return db_user_common_reward
+
+# ServiceCategory CRUD operations
+def get_service_category(db: Session, service_category_id: int) -> Optional[ServiceCategory]:
+    return db.query(ServiceCategory).filter(ServiceCategory.id == service_category_id).first()
