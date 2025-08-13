@@ -181,10 +181,10 @@ def update_user_reward_position(
             "reward_id": updated_reward.common_reward_id,
             "name": updated_reward.common_reward.name,
             "description": updated_reward.common_reward.description,
-            "image_url": r.common_reward.image_url,
-            "acquired_at": r.acquired_at,
-            "position_x": r.position_x,
-            "position_y": r.position_y,
+            "image_url": updated_reward.common_reward.image_url,
+            "acquired_at": updated_reward.acquired_at,
+            "position_x": updated_reward.position_x,
+            "position_y": updated_reward.position_y,
             "type": "common"
         }
     else: # personalization
@@ -193,28 +193,31 @@ def update_user_reward_position(
             "user_id": updated_reward.user_id,
             "name": updated_reward.name,
             "description": updated_reward.description,
-            "generation_prompt": r.generation_prompt,
-            "generated_image_url": r.generated_image_url,
-            "acquired_at": r.created_at,
-            "position_x": r.position_x,
-            "position_y": r.position_y,
+            "generation_prompt": updated_reward.generation_prompt,
+            "generated_image_url": updated_reward.generated_image_url,
+            "acquired_at": updated_reward.created_at,
+            "position_x": updated_reward.position_x,
+            "position_y": updated_reward.position_y,
             "type": "personalization"
         }
 
 # 사용자에게 공용 리워드 지급
 @router.post("/users/{user_id}/common-rewards/{common_reward_id}/award", response_model=UserCommonReward)
-def award_common_reward_to_user(user_id: int, common_reward_id: int, db: Session = Depends(get_db)):
+def award_common_reward_to_user(
+    user_id: int,
+    common_reward_id: int,
+    db: Session = Depends(get_db)
+):
+    # Get the common reward to be awarded
     db_common_reward = crud_service.get_common_reward(db, common_reward_id)
     if not db_common_reward: # type: ignore
         raise HTTPException(status_code=404, detail="Common Reward not found")
 
-    user_common_reward_data = UserCommonRewardCreate(
-        user_id=user_id,
-        common_reward_id=common_reward_id,
-        position_x=None,
-        position_y=None
+    # Use the new update_user_common_reward_stage logic
+    updated_user_reward = crud_service.update_user_common_reward_stage(
+        db, user_id, common_reward_id, db_common_reward.service_category_id
     )
-    return crud_service.create_user_common_reward(db=db, user_common_reward=user_common_reward_data)
+    return updated_user_reward
 
 # AI 개인화 리워드 생성 요청
 @router.post("/rewards/request-ai-generation", response_model=PersonalizationReward)

@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from sqlalchemy import desc
 
 from app import models, schemas
 from app.models.common_reward import CommonReward
@@ -116,3 +117,50 @@ def update_user_common_reward_position(db: Session, user_common_reward_id: int, 
 # ServiceCategory CRUD operations
 def get_service_category(db: Session, service_category_id: int) -> Optional[ServiceCategory]:
     return db.query(ServiceCategory).filter(ServiceCategory.id == service_category_id).first()
+
+# New: Get user's highest stage common reward for a specific service
+def get_user_highest_stage_common_reward_for_service(
+    db: Session, user_id: int, service_category_id: int
+) -> Optional[UserCommonReward]:
+    return (
+        db.query(models.user_common_reward.UserCommonReward)
+        .join(models.common_reward.CommonReward) # Join with CommonReward to access stage
+        .filter(
+            models.user_common_reward.UserCommonReward.user_id == user_id,
+            models.common_reward.CommonReward.service_category_id == service_category_id
+        )
+        .order_by(desc(models.common_reward.CommonReward.stage))
+        .first()
+    )
+
+# New: Update user's common reward stage or create new
+def update_user_common_reward_stage(
+    db: Session, user_id: int, new_common_reward_id: int, service_category_id: int
+) -> UserCommonReward:
+    # Get the stage of the new common reward
+    new_common_reward = get_common_reward(db, new_common_reward_id)
+    if not new_common_reward:
+        raise ValueError(f"Common reward with ID {new_common_reward_id} not found.")
+
+    # Get the user's current highest stage common reward for this service
+    existing_user_reward = get_user_highest_stage_common_reward_for_service(db, user_id, service_category_id)
+
+    if existing_user_reward:
+        # If new stage is higher, update the existing reward
+        if new_common_reward.stage > existing_user_reward.common_reward.stage:
+            existing_user_reward.common_reward_id = new_common_reward_id
+            db.commit()
+            db.refresh(existing_user_reward)
+            return existing_user_reward
+        else:
+            # If new stage is not higher, return the existing one (no update needed)
+            return existing_user_reward
+    else:
+        # If no existing reward, create a new one
+        user_common_reward_data = schemas.UserCommonRewardCreate(
+            user_id=user_id,
+            common_reward_id=new_common_reward_id,
+            position_x=None,
+            position_y=None
+        )
+        return create_user_common_reward(db, user_common_reward_data)
