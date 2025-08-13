@@ -29,7 +29,7 @@ def generate_ai_image(prompt: str) -> str:
         client = OpenAI(api_key=Config.OPENAI_API_KEY)
         response = client.images.generate(
             model="dall-e-3", # DALL-E 3 사용
-            prompt=prompt, # Dify에서 받은 프롬프트를 그대로 사용
+            prompt=f"{prompt}, clean isolated object, on a solid high-contrast background, studio lighting", # Dify에서 받은 프롬프트에 후처리용 지시어 추가
             size="1024x1024",
             n=1,
         )
@@ -64,11 +64,11 @@ async def _process_message(msg):
 당신은 사용자의 기억을 아름다운 이미지로 변환하는 예술가입니다.
 
 # 지시
-주어진 컨텍스트(사용자의 기억)의 핵심 감정과 내용을 포착하여, DALL-E가 이미지를 생성할 수 있는, 영어로 된, 배경이 없는(transparent background), 하나의 사물을 묘사하는 한 문장의 프롬프트를 생성해주세요. 'in pixel art style'을 포함해야 합니다. **이때, 컨텍스트에서 추출된 고유한 키워드(예: '돌잡이', '한복', '특정 인물 이름')를 반드시 프롬프트에 포함해야 합니다.**
+주어진 컨텍스트(사용자의 기억)의 핵심 감정과 내용을 포착하여, DALL-E가 이미지를 생성할 수 있는, 영어로 된, 배경 제거가 용이하도록 단색의 고대비 배경 위에 고립된 사물을 묘사하는 한 문장의 프롬프트를 생성해주세요. 'in pixel art style'을 포함해야 합니다. **이때, 컨텍스트에서 추출된 고유한 키워드(예: '돌잡이', '한복', '특정 인물 이름')를 반드시 프롬프트에 포함해야 합니다.**
 또한, 이 이미지가 어떤 기억을 기반으로 생성되었는지 설명하는 한국어 문장을 20자 내외로 생성해주세요. **이 설명에는 컨텍스트 내의 구체적인 인물 이름, 장소, 날짜, 또는 사건의 핵심 키워드를 반드시 포함하여 개인화된 느낌을 주어야 합니다.**
 
 # 출력 규칙
-응답은 반드시 아래의 JSON 형식이어야 합니다.
+응답은 반드시 아래의 JSON 형식이어 합니다.
 {{
   "dalle_prompt": "생성된 DALL-E 프롬프트",
   "memory_description": "기억 기반 설명 텍스트"

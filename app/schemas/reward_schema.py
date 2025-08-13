@@ -1,6 +1,7 @@
 from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 from datetime import datetime
+from fastapi import UploadFile, File
 
 # CommonReward 스키마
 class CommonRewardBase(BaseModel):
@@ -57,3 +58,12 @@ class UserCommonReward(UserCommonRewardBase):
     common_reward: CommonReward # CommonReward 정보 포함
 
     model_config = ConfigDict(from_attributes=True)
+
+# CommonGrowthReward 스키마 (5단계 성장형 공용 보상 일괄 등록용)
+class CommonGrowthRewardCreate(BaseModel):
+    service_category_id: int
+    stage_1_image: UploadFile
+    stage_2_image: UploadFile
+    stage_3_image: UploadFile
+    stage_4_image: UploadFile
+    stage_5_image: UploadFile
