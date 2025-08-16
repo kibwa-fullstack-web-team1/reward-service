@@ -118,7 +118,9 @@ def get_user_rewards(user_id: int, db: Session = Depends(get_db)):
             "acquired_at": r.acquired_at,
             "position_x": r.position_x,
             "position_y": r.position_y,
-            "type": "common"
+            "type": "common",
+            "service_category_id": r.common_reward.service_category_id,
+            "stage": r.common_reward.stage
         })
     for r in personalization_rewards:
         combined_rewards.append({
@@ -185,7 +187,9 @@ def update_user_reward_position(
             "acquired_at": updated_reward.acquired_at,
             "position_x": updated_reward.position_x,
             "position_y": updated_reward.position_y,
-            "type": "common"
+            "type": "common",
+            "service_category_id": r.common_reward.service_category_id,
+            "stage": r.common_reward.stage
         }
     else: # personalization
         return {
