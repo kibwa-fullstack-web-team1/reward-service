@@ -7,6 +7,7 @@ from app.models.common_reward import CommonReward
 from app.models.personalization_reward import PersonalizationReward
 from app.models.user_common_reward import UserCommonReward
 from app.models.service_category import ServiceCategory # New import
+from app.core.aws_s3_service import S3Service
 
 # CommonReward CRUD operations
 def create_common_reward(db: Session, reward: schemas.CommonRewardCreate) -> CommonReward:
@@ -47,6 +48,39 @@ def delete_common_reward(db: Session, reward_id: int) -> Optional[CommonReward]:
         db.delete(db_reward)
         db.commit()
     return db_reward
+
+def delete_common_rewards_by_category(db: Session, service_category_id: int) -> int:
+    """
+    특정 서비스 카테고리에 속한 모든 공용 보상을 DB와 S3에서 삭제합니다.
+    """
+    # 1. 해당 카테고리의 모든 공용 보상 조회
+    rewards_to_delete = db.query(CommonReward).filter(CommonReward.service_category_id == service_category_id).all()
+    
+    if not rewards_to_delete:
+        return 0
+
+    # 2. S3에서 관련 파일 삭제
+    s3_service = S3Service()
+    object_keys = []
+    for reward in rewards_to_delete:
+        if reward.image_url and s3_service.bucket_name in reward.image_url:
+            # URL에서 객체 키 추출 (예: https://bucket.s3.region.amazonaws.com/key -> key)
+            key = '/'.join(reward.image_url.split('/')[3:])
+            object_keys.append(key)
+    
+    if object_keys:
+        s3_deleted = s3_service.delete_files(object_keys)
+        if not s3_deleted:
+            # S3 삭제 실패 시, DB 삭제를 진행하지 않음
+            raise Exception("Failed to delete files from S3. Aborting operation.")
+
+    # 3. 데이터베이스에서 보상 삭제
+    # UserCommonReward에서 해당 보상을 참조하는 경우를 먼저 처리해야 할 수 있음 (예: ON DELETE SET NULL)
+    # 여기서는 CASCADE 설정이 되어 있다고 가정하고 진행
+    num_deleted = db.query(CommonReward).filter(CommonReward.service_category_id == service_category_id).delete(synchronize_session=False)
+    db.commit()
+    
+    return num_deleted
 
 # PersonalizationReward CRUD operations
 def create_personalization_reward(db: Session, reward: schemas.PersonalizationRewardCreate) -> PersonalizationReward:

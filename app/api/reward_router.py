@@ -36,6 +36,19 @@ def get_common_reward(reward_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Reward not found")
     return db_reward
 
+@router.delete("/rewards/common/by-category/{service_category_id}", status_code=200)
+def delete_common_rewards_by_category(service_category_id: int, db: Session = Depends(get_db)):
+    """
+    특정 서비스 카테고리에 속한 모든 공용 보상을 DB와 S3에서 삭제합니다.
+    """
+    try:
+        num_deleted = crud_service.delete_common_rewards_by_category(db, service_category_id)
+        if num_deleted == 0:
+            return {"message": "No common rewards found for this category to delete."}
+        return {"message": f"Successfully deleted {num_deleted} common rewards for service category {service_category_id}."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # 5단계 성장형 공용 보상 일괄 등록 엔드포인트
 @router.post("/rewards/common-growth", response_model=List[CommonReward])
 async def create_common_growth_rewards(

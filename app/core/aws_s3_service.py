@@ -1,7 +1,7 @@
 import boto3
 from botocore.exceptions import ClientError
 import logging
-from typing import Optional # Optional 임포트 추가
+from typing import Optional, List
 from app.config.config import Config
 
 logger = logging.getLogger(__name__)
@@ -40,3 +40,35 @@ class S3Service:
         except Exception as e:
             logger.error(f"An unexpected error occurred during S3 upload: {e}")
             return None
+
+    def delete_file(self, object_name: str) -> bool:
+        """
+        S3 버킷에서 특정 객체를 삭제합니다.
+        :param object_name: 삭제할 객체의 이름 (경로 포함)
+        :return: 삭제 성공 시 True, 실패 시 False
+        """
+        try:
+            self.s3_client.delete_object(Bucket=self.bucket_name, Key=object_name)
+            logger.info(f"File {object_name} deleted successfully from S3.")
+            return True
+        except ClientError as e:
+            logger.error(f"Failed to delete file {object_name} from S3: {e}")
+            return False
+
+    def delete_files(self, object_names: List[str]) -> bool:
+        """
+        S3 버킷에서 여러 객체를 한 번에 삭제합니다.
+        :param object_names: 삭제할 객체 이름의 리스트
+        :return: 삭제 성공 시 True, 실패 시 False
+        """
+        if not object_names:
+            return True
+        
+        delete_keys = {'Objects': [{'Key': name} for name in object_names]}
+        try:
+            self.s3_client.delete_objects(Bucket=self.bucket_name, Delete=delete_keys)
+            logger.info(f"Successfully deleted {len(object_names)} files from S3.")
+            return True
+        except ClientError as e:
+            logger.error(f"Failed to delete files from S3: {e}")
+            return False
