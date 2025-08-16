@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Body, Query, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
+import os
 from app.core.kafka_producer_service import get_kafka_producer, produce_reward_generation_request
 from app.utils.db import get_db
 from app.core import crud_service
@@ -61,8 +62,9 @@ async def create_common_growth_rewards(
 
     for i, image_file in enumerate(images):
         contents = await image_file.read()
-        # 이미지 이름에 service_name 포함 및 공백 처리
-        object_name = f"common-rewards/{service_name.replace(' ', '_')}/{service_category_id}/stage_{i+1}.png"
+        # 업로드된 파일의 원래 확장자를 사용
+        file_extension = os.path.splitext(image_file.filename)[1]
+        object_name = f"common-rewards/{service_name.replace(' ', '_')}/{service_category_id}/stage_{i+1}{file_extension}"
         image_url = s3_service.upload_file(contents, object_name, image_file.content_type)
         if not image_url:
             raise HTTPException(status_code=500, detail=f"Failed to upload stage {i+1} image to S3")
