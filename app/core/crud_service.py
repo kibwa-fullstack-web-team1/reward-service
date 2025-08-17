@@ -53,30 +53,19 @@ def delete_common_rewards_by_category(db: Session, service_category_id: int) -> 
     """
     특정 서비스 카테고리에 속한 모든 공용 보상을 DB와 S3에서 삭제합니다.
     """
-    # 1. 해당 카테고리의 모든 공용 보상 조회
     rewards_to_delete = db.query(CommonReward).filter(CommonReward.service_category_id == service_category_id).all()
     
     if not rewards_to_delete:
         return 0
 
-    # 2. S3에서 관련 파일 삭제
     s3_service = S3Service()
-    object_keys = []
-    for reward in rewards_to_delete:
-        if reward.image_url and s3_service.bucket_name in reward.image_url:
-            # URL에서 객체 키 추출 (예: https://bucket.s3.region.amazonaws.com/key -> key)
-            key = '/'.join(reward.image_url.split('/')[3:])
-            object_keys.append(key)
+    object_keys = ['/'.join(r.image_url.split('/')[3:]) for r in rewards_to_delete if r.image_url and s3_service.bucket_name in r.image_url]
     
     if object_keys:
         s3_deleted = s3_service.delete_files(object_keys)
         if not s3_deleted:
-            # S3 삭제 실패 시, DB 삭제를 진행하지 않음
             raise Exception("Failed to delete files from S3. Aborting operation.")
 
-    # 3. 데이터베이스에서 보상 삭제
-    # UserCommonReward에서 해당 보상을 참조하는 경우를 먼저 처리해야 할 수 있음 (예: ON DELETE SET NULL)
-    # 여기서는 CASCADE 설정이 되어 있다고 가정하고 진행
     num_deleted = db.query(CommonReward).filter(CommonReward.service_category_id == service_category_id).delete(synchronize_session=False)
     db.commit()
     
@@ -84,15 +73,7 @@ def delete_common_rewards_by_category(db: Session, service_category_id: int) -> 
 
 # PersonalizationReward CRUD operations
 def create_personalization_reward(db: Session, reward: schemas.PersonalizationRewardCreate) -> PersonalizationReward:
-    db_reward = PersonalizationReward(
-        user_id=reward.user_id,
-        name=reward.name,
-        description=reward.description,
-        generation_prompt=reward.generation_prompt,
-        generated_image_url=reward.generated_image_url,
-        position_x=reward.position_x,
-        position_y=reward.position_y
-    )
+    db_reward = PersonalizationReward(**reward.model_dump())
     db.add(db_reward)
     db.commit()
     db.refresh(db_reward)
@@ -122,12 +103,7 @@ def delete_personalization_reward(db: Session, reward_id: int) -> Optional[Perso
 
 # UserCommonReward CRUD operations
 def create_user_common_reward(db: Session, user_common_reward: schemas.UserCommonRewardCreate) -> UserCommonReward:
-    db_user_common_reward = UserCommonReward(
-        user_id=user_common_reward.user_id,
-        common_reward_id=user_common_reward.common_reward_id,
-        position_x=user_common_reward.position_x,
-        position_y=user_common_reward.position_y
-    )
+    db_user_common_reward = UserCommonReward(**user_common_reward.model_dump())
     db.add(db_user_common_reward)
     db.commit()
     db.refresh(db_user_common_reward)
@@ -138,6 +114,12 @@ def get_user_common_rewards(db: Session, user_id: int) -> List[UserCommonReward]
 
 def get_user_common_reward_by_id(db: Session, user_common_reward_id: int) -> Optional[UserCommonReward]:
     return db.query(UserCommonReward).filter(UserCommonReward.id == user_common_reward_id).first()
+
+def get_user_common_reward_by_reward_id(db: Session, user_id: int, common_reward_id: int) -> Optional[UserCommonReward]:
+    return db.query(UserCommonReward).filter(
+        UserCommonReward.user_id == user_id,
+        UserCommonReward.common_reward_id == common_reward_id
+    ).first()
 
 def update_user_common_reward_position(db: Session, user_common_reward_id: int, position_x: Optional[int], position_y: Optional[int]) -> Optional[UserCommonReward]:
     db_user_common_reward = db.query(UserCommonReward).filter(UserCommonReward.id == user_common_reward_id).first()
@@ -152,43 +134,18 @@ def update_user_common_reward_position(db: Session, user_common_reward_id: int, 
 def get_service_category(db: Session, service_category_id: int) -> Optional[ServiceCategory]:
     return db.query(ServiceCategory).filter(ServiceCategory.id == service_category_id).first()
 
-# New: Get user's highest stage common reward for a specific service
-def get_user_highest_stage_common_reward_for_service(
-    db: Session, user_id: int, service_category_id: int
-) -> Optional[UserCommonReward]:
-    return (
-        db.query(models.user_common_reward.UserCommonReward)
-        .join(models.common_reward.CommonReward) # Join with CommonReward to access stage
-        .filter(
-            models.user_common_reward.UserCommonReward.user_id == user_id,
-            models.common_reward.CommonReward.service_category_id == service_category_id
-        )
-        .order_by(desc(models.common_reward.CommonReward.stage))
-        .first()
-    )
-
-# New: Update user's common reward stage or create new
+# Refactored: Award a common reward to a user if they don't already have it.
 def update_user_common_reward_stage(
     db: Session, user_id: int, new_common_reward_id: int, service_category_id: int
 ) -> UserCommonReward:
-    # Get the stage of the new common reward
-    new_common_reward = get_common_reward(db, new_common_reward_id)
-    if not new_common_reward:
-        raise ValueError(f"Common reward with ID {new_common_reward_id} not found.")
-
-    # Get the user's current highest stage common reward for this service
-    existing_user_reward = get_user_highest_stage_common_reward_for_service(db, user_id, service_category_id)
+    # service_category_id is kept for signature consistency with the router, but not used in the new logic.
+    
+    # Check if the user already has this specific reward
+    existing_user_reward = get_user_common_reward_by_reward_id(db, user_id, new_common_reward_id)
 
     if existing_user_reward:
-        # If new stage is higher, update the existing reward
-        if new_common_reward.stage > existing_user_reward.common_reward.stage:
-            existing_user_reward.common_reward_id = new_common_reward_id
-            db.commit()
-            db.refresh(existing_user_reward)
-            return existing_user_reward
-        else:
-            # If new stage is not higher, return the existing one (no update needed)
-            return existing_user_reward
+        # If reward already awarded, return the existing record
+        return existing_user_reward
     else:
         # If no existing reward, create a new one
         user_common_reward_data = schemas.UserCommonRewardCreate(
