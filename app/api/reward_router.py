@@ -152,6 +152,14 @@ def get_user_rewards(user_id: int, db: Session = Depends(get_db)):
         })
     return combined_rewards
 
+# 개인화 리워드 상세 조회
+@router.get("/rewards/personalization/{reward_id}", response_model=PersonalizationReward)
+def get_personalization_reward(reward_id: int, db: Session = Depends(get_db)):
+    db_reward = crud_service.get_personalization_reward(db, reward_id=reward_id)
+    if db_reward is None:
+        raise HTTPException(status_code=404, detail="Personalization Reward not found")
+    return db_reward
+
 # 특정 사용자 획득 공용 리워드 상세 조회
 @router.get("/user-common-rewards/{user_common_reward_id}", response_model=UserCommonReward)
 def get_user_common_reward(user_common_reward_id: int, db: Session = Depends(get_db)):
