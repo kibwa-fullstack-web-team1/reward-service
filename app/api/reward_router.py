@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Body, Query, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
+import os
 from app.core.kafka_producer_service import get_kafka_producer, produce_reward_generation_request
 from app.utils.db import get_db
 from app.core import crud_service
@@ -35,6 +36,19 @@ def get_common_reward(reward_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Reward not found")
     return db_reward
 
+@router.delete("/rewards/common/by-category/{service_category_id}", status_code=200)
+def delete_common_rewards_by_category(service_category_id: int, db: Session = Depends(get_db)):
+    """
+    특정 서비스 카테고리에 속한 모든 공용 보상을 DB와 S3에서 삭제합니다.
+    """
+    try:
+        num_deleted = crud_service.delete_common_rewards_by_category(db, service_category_id)
+        if num_deleted == 0:
+            return {"message": "No common rewards found for this category to delete."}
+        return {"message": f"Successfully deleted {num_deleted} common rewards for service category {service_category_id}."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # 5단계 성장형 공용 보상 일괄 등록 엔드포인트
 @router.post("/rewards/common-growth", response_model=List[CommonReward])
 async def create_common_growth_rewards(
@@ -61,8 +75,9 @@ async def create_common_growth_rewards(
 
     for i, image_file in enumerate(images):
         contents = await image_file.read()
-        # 이미지 이름에 service_name 포함 및 공백 처리
-        object_name = f"common-rewards/{service_name.replace(' ', '_')}/{service_category_id}/stage_{i+1}.png"
+        # 업로드된 파일의 원래 확장자를 사용
+        file_extension = os.path.splitext(image_file.filename)[1]
+        object_name = f"common-rewards/{service_name.replace(' ', '_')}/{service_category_id}/stage_{i+1}{file_extension}"
         image_url = s3_service.upload_file(contents, object_name, image_file.content_type)
         if not image_url:
             raise HTTPException(status_code=500, detail=f"Failed to upload stage {i+1} image to S3")
@@ -118,7 +133,9 @@ def get_user_rewards(user_id: int, db: Session = Depends(get_db)):
             "acquired_at": r.acquired_at,
             "position_x": r.position_x,
             "position_y": r.position_y,
-            "type": "common"
+            "type": "common",
+            "service_category_id": r.common_reward.service_category_id,
+            "stage": r.common_reward.stage
         })
     for r in personalization_rewards:
         combined_rewards.append({
@@ -134,6 +151,14 @@ def get_user_rewards(user_id: int, db: Session = Depends(get_db)):
             "type": "personalization"
         })
     return combined_rewards
+
+# 개인화 리워드 상세 조회
+@router.get("/rewards/personalization/{reward_id}", response_model=PersonalizationReward)
+def get_personalization_reward(reward_id: int, db: Session = Depends(get_db)):
+    db_reward = crud_service.get_personalization_reward(db, reward_id=reward_id)
+    if db_reward is None:
+        raise HTTPException(status_code=404, detail="Personalization Reward not found")
+    return db_reward
 
 # 특정 사용자 획득 공용 리워드 상세 조회
 @router.get("/user-common-rewards/{user_common_reward_id}", response_model=UserCommonReward)
@@ -185,7 +210,9 @@ def update_user_reward_position(
             "acquired_at": updated_reward.acquired_at,
             "position_x": updated_reward.position_x,
             "position_y": updated_reward.position_y,
-            "type": "common"
+            "type": "common",
+            "service_category_id": r.common_reward.service_category_id,
+            "stage": r.common_reward.stage
         }
     else: # personalization
         return {
